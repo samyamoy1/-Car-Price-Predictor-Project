@@ -29,10 +29,10 @@ render.yaml
 Open `index.html`, find this line at the top of the script:
 
 ```js
-const API_URL = 'https://your-app-name.onrender.com/predict';
+const API_URL = 'https://car-price-predictor-project-jz3w.onrender.com';
 ```
 
-Replace with your actual Render URL.
+
 
 ## Deploy Frontend on GitHub Pages
 
