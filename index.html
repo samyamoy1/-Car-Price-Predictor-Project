@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Car Price Predictor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #f5f5f5;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    color: #111;
+    padding: 40px 20px 80px;
+  }
+
+  .wrap { max-width: 520px; margin: 0 auto; }
+
+  .page-title {
+    font-size: 20px;
+    font-weight: bold;
+    border-bottom: 2px solid #111;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+
+  .page-sub { font-size: 11px; color: #888; margin-bottom: 32px; }
+
+  .field { margin-bottom: 18px; }
+
+  label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #555;
+    margin-bottom: 5px;
+  }
+
+  input, select {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid #bbb;
+    border-radius: 0;
+    background: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    color: #111;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input:focus, select:focus { border-color: #111; }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23555'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+    cursor: pointer;
+  }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .autocomplete-wrap { position: relative; }
+
+  .suggestions {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: #fff;
+    border: 1px solid #111;
+    border-top: none;
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 50;
+    display: none;
+  }
+
+  .suggestions.open { display: block; }
+
+  .suggestions div { padding: 8px 10px; cursor: pointer; font-size: 13px; }
+  .suggestions div:hover, .suggestions div.active { background: #111; color: #fff; }
+
+  .divider { border: none; border-top: 1px solid #ccc; margin: 24px 0; }
+
+  button {
+    width: 100%;
+    padding: 11px;
+    background: #111;
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  button:hover { background: #333; }
+  button:disabled { background: #999; cursor: not-allowed; }
+
+  .result {
+    margin-top: 24px;
+    border: 1px solid #bbb;
+    padding: 20px;
+    display: none;
+    background: #fff;
+  }
+
+  .result.show { display: block; }
+  .result.err  { border-color: #c00; }
+
+  .result-tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin-bottom: 6px; }
+  .result-price { font-size: 36px; font-weight: bold; }
+  .result-range { font-size: 12px; color: #666; margin-top: 4px; }
+  .result-note { font-size: 12px; color: #444; margin-top: 12px; border-top: 1px solid #eee; padding-top: 10px; line-height: 1.6; }
+
+  .err-msg { color: #c00; }
+
+  .loader {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid #fff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 420px) { .row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="page-title">Car Price Predictor</div>
+  <div class="page-sub">Linear Regression &mdash; Quikr Used Cars Dataset &mdash; R&sup2; 0.899</div>
+
+  <div class="field">
+    <label>Company</label>
+    <select id="company" onchange="onCompanyChange()">
+      <option value="">-- Select --</option>
+      <option>Hyundai</option>
+      <option>Mahindra</option>
+      <option>Ford</option>
+      <option>Maruti</option>
+      <option>Skoda</option>
+      <option>Audi</option>
+      <option>Toyota</option>
+      <option>Renault</option>
+      <option>Honda</option>
+      <option>Datsun</option>
+      <option>Mitsubishi</option>
+      <option>Tata</option>
+      <option>Volkswagen</option>
+      <option>Chevrolet</option>
+      <option>Mini</option>
+      <option>BMW</option>
+      <option>Nissan</option>
+      <option>Hindustan</option>
+      <option>Fiat</option>
+      <option>Force</option>
+      <option>Mercedes</option>
+      <option>Land</option>
+      <option>Jaguar</option>
+      <option>Jeep</option>
+      <option>Volvo</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Car Model</label>
+    <div class="autocomplete-wrap">
+      <input type="text" id="carName" placeholder="Select company first" autocomplete="off"
+        oninput="onCarInput()" onkeydown="onCarKey(event)" />
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Fuel Type</label>
+    <select id="fuelType">
+      <option value="">-- Select --</option>
+      <option>Petrol</option>
+      <option>Diesel</option>
+      <option>LPG</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label>Year</label>
+      <input type="number" id="year" placeholder="e.g. 2017" min="1995" max="2024" />
+    </div>
+    <div class="field">
+      <label>Kms Driven</label>
+      <input type="number" id="kmsDriven" placeholder="e.g. 45000" min="0" />
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <button id="btn" onclick="predict()">Predict Price</button>
+
+  <div class="result" id="result">
+    <div class="result-tag">Estimated Resale Price</div>
+    <div class="result-price" id="rPrice"></div>
+    <div class="result-range" id="rRange"></div>
+    <div class="result-note"  id="rNote"></div>
+  </div>
+
+</div>
+<script>
+// REPLACE THIS with your Render URL after deploying
+const API_URL = 'https://your-app-name.onrender.com/predict';
+
+const CAR_MODELS = {
+  Hyundai:['Hyundai Santro Xing','Hyundai Grand i10','Hyundai Eon','Hyundai Elite i20','Hyundai i20 Sportz','Hyundai i20 Magna','Hyundai Verna Transform','Hyundai i10 Magna','Hyundai Verna Fluidic','Hyundai i20 Asta','Hyundai i10 Sportz','Hyundai Eon Era','Hyundai i20','Hyundai Fluidic Verna','Hyundai Creta 1.6','Hyundai i20 Active','Hyundai Eon Sportz','Hyundai Accent GLX','Hyundai Elantra SX','Hyundai i10','Hyundai Accent','Hyundai Verna','Hyundai Verna 1.4','Hyundai Sonata Transform','Hyundai Verna 1.6','Hyundai Xcent Base','Hyundai Accent Executive','Hyundai Eon Magna','Hyundai Eon D','Hyundai Getz Prime','Hyundai Santro','Hyundai Accent GLE','Hyundai Verna VGT','Hyundai i10 Era','Hyundai Xcent SX','Hyundai Elantra 1.8','Hyundai Santro AE','Hyundai Getz GLE','Hyundai Creta','Hyundai i20 Select','Hyundai Getz'],
+  Mahindra:['Mahindra Jeep CL550','Mahindra Scorpio SLE','Mahindra Scorpio S10','Mahindra Bolero DI','Mahindra Scorpio S4','Mahindra Scorpio VLX','Mahindra Quanto C8','Mahindra XUV500 W8','Mahindra Scorpio','Mahindra XUV500','Mahindra Scorpio SLX','Mahindra Xylo E4','Mahindra Jeep MM','Mahindra Bolero SLE','Mahindra Thar CRDe','Mahindra TUV300 T4','Mahindra Scorpio 2.6','Mahindra KUV100 K8','Mahindra Bolero Power','Mahindra Scorpio W','Mahindra TUV300 T8','Mahindra Logan Diesel','Mahindra XUV500 W6','Mahindra Scorpio Vlx','Mahindra XUV500 W10','Mahindra Xylo E8','Mahindra KUV100','Mahindra Scorpio LX','Mahindra Xylo D2','Mahindra Logan','Mahindra Quanto C4'],
+  Ford:['Ford EcoSport Titanium','Ford Figo','Ford EcoSport Ambiente','Ford EcoSport','Ford Figo Diesel','Ford EcoSport Trend','Ford Fiesta','Ford Ikon 1.3','Ford Figo Duratorq','Ford Figo Petrol','Ford Fiesta SXi','Ford Ikon 1.6','Ford Fusion 1.4','Ford Endeavor 4x4'],
+  Maruti:['Maruti Suzuki Alto','Maruti Suzuki Stingray','Maruti Suzuki Vitara','Maruti Suzuki Swift','Maruti Suzuki Wagon','Maruti Suzuki Baleno','Maruti Suzuki Dzire','Maruti Suzuki SX4','Maruti Suzuki A','Maruti Suzuki Ertiga','Maruti Suzuki Eeco','Maruti Suzuki Esteem','Maruti Suzuki Ritz','Maruti Suzuki Ciaz','Maruti Suzuki Zen','Maruti Suzuki Maruti','Maruti Suzuki Versa','Maruti Suzuki Omni','Maruti Suzuki 800','Maruti Suzuki Estilo','Maruti Suzuki Celerio','Maruti Suzuki S'],
+  Skoda:['Skoda Fabia Classic','Skoda Yeti Ambition','Skoda Fabia 1.2L','Skoda Laura','Skoda Rapid Elegance','Skoda Superb 1.8','Skoda Octavia Classic','Skoda Fabia'],
+  Audi:['Audi A8','Audi Q7','Audi A4 1.8','Audi A4 2.0','Audi Q3 2.0','Audi A6 2.0','Audi Q5 2.0','Audi A3 Cabriolet'],
+  Toyota:['Toyota Innova 2.0','Toyota Corolla Altis','Toyota Etios GD','Toyota Etios Liva','Toyota Innova 2.5','Toyota Etios','Toyota Fortuner','Toyota Fortuner 3.0','Toyota Corolla H2','Toyota Corolla','Toyota Etios G','Toyota Qualis'],
+  Renault:['Renault Lodgy 85','Renault Duster 110','Renault Duster 85','Renault Duster 110PS','Renault Duster','Renault Kwid','Renault Scala RxL','Renault Kwid RXT','Renault Kwid 1.0','Renault Duster 85PS','Renault Duster RxL'],
+  Honda:['Honda City 1.5','Honda Amaze','Honda Amaze 1.5','Honda City','Honda City ZX','Honda Brio','Honda Amaze 1.2','Honda City VX','Honda Jazz VX','Honda Accord','Honda Mobilio','Honda Jazz S','Honda Brio V','Honda City SV','Honda Mobilio S','Honda Brio VX','Honda WR V'],
+  Datsun:['Datsun Redi GO','Datsun GO T','Datsun Go Plus'],
+  Mitsubishi:['Mitsubishi Pajero Sport','Mitsubishi Lancer 1.8'],
+  Tata:['Tata Indigo eCS','Tata Indica V2','Tata Indigo CS','Tata Nano Cx','Tata Sumo Victa','Tata Aria Pleasure','Tata Sumo Gold','Tata Manza Aura','Tata Vista Quadrajet','Tata Indigo LX','Tata Manza ELAN','Tata Indigo LS','Tata Nano GenX','Tata Zest XE','Tata Tigor Revotron','Tata Indica','Tata Nano Lx','Tata Nano','Tata Zest Quadrajet','Tata Indigo Marina','Tata Nano LX','Tata Manza Aqua','Tata Venture EX','Tata Indica eV2','Tata Tiago Revotron','Tata Tiago Revotorq','Tata Sumo Grande','Tata Bolt XM','Tata Manza','Tata Zest XM'],
+  Volkswagen:['Volkswagen Polo Highline','Volkswagen Vento Highline','Volkswagen Jetta Highline','Volkswagen Polo Comfortline','Volkswagen Polo','Volkswagen Passat Diesel','Volkswagen Vento Konekt','Volkswagen Polo Trendline','Volkswagen Vento Comfortline','Volkswagen Jetta Comfortline','Volkswagen Polo Highline1.2L'],
+  Chevrolet:['Chevrolet Spark LS','Chevrolet Beat LT','Chevrolet Spark','Chevrolet Beat','Chevrolet Spark LT','Chevrolet Beat LS','Chevrolet Tavera Neo','Chevrolet Enjoy 1.4','Chevrolet Sail UVA','Chevrolet Beat Diesel','Chevrolet Beat PS','Chevrolet Cruze LTZ','Chevrolet Spark 1.0','Chevrolet Enjoy','Chevrolet Tavera LS','Chevrolet Sail 1.2'],
+  Mini:['Mini Cooper S'],
+  BMW:['BMW 3 Series','BMW 7 Series','BMW 5 Series','BMW X1 xDrive20d','BMW X1 sDrive20d','BMW X1'],
+  Nissan:['Nissan Micra XV','Nissan Sunny','Nissan Terrano XL','Nissan X Trail','Nissan Sunny XL','Nissan Micra XL'],
+  Hindustan:['Hindustan Motors Ambassador'],
+  Fiat:['Fiat Punto Emotion','Fiat Petra ELX','Fiat Linea Emotion'],
+  Force:['Force Motors Force','Force Motors One'],
+  Mercedes:['Mercedes Benz GLA','Mercedes Benz B','Mercedes Benz C','Mercedes Benz A'],
+  Land:['Land Rover Freelander'],
+  Jaguar:['Jaguar XE XE','Jaguar XF 2.2'],
+  Jeep:['Jeep Wrangler Unlimited'],
+  Volvo:['Volvo S80 Summum']
+};
+
+let activeIdx = -1;
+
+function onCompanyChange() {
+  const co  = document.getElementById('company').value;
+  const inp = document.getElementById('carName');
+  inp.value = '';
+  inp.placeholder = co ? 'Type to search ' + co + ' models...' : 'Select company first';
+  hideSug();
+}
+
+function onCarInput() {
+  const co = document.getElementById('company').value;
+  if (!co) return hideSug();
+  const models = CAR_MODELS[co] || [];
+  const q = document.getElementById('carName').value.toLowerCase();
+  const hits = q ? models.filter(m => m.toLowerCase().includes(q)) : models;
+  renderSug(hits);
+}
+
+function onCarKey(e) {
+  const items = document.getElementById('suggestions').querySelectorAll('div');
+  if (!items.length) return;
+  if (e.key==='ArrowDown')  { e.preventDefault(); activeIdx=Math.min(activeIdx+1,items.length-1); hl(items); }
+  else if (e.key==='ArrowUp') { e.preventDefault(); activeIdx=Math.max(activeIdx-1,0); hl(items); }
+  else if (e.key==='Enter'&&activeIdx>=0) { e.preventDefault(); items[activeIdx].click(); }
+  else if (e.key==='Escape') hideSug();
+}
+
+function renderSug(list) {
+  const box = document.getElementById('suggestions');
+  const inp = document.getElementById('carName');
+  activeIdx=-1;
+  if (!list.length) return hideSug();
+  box.innerHTML=list.map(m=>`<div>${m}</div>`).join('');
+  box.classList.add('open');
+  box.querySelectorAll('div').forEach(d=>{
+    d.addEventListener('click',()=>{ inp.value=d.textContent; hideSug(); });
+  });
+}
+
+function hl(items) {
+  items.forEach((d,i)=>d.classList.toggle('active',i===activeIdx));
+  if (activeIdx>=0) items[activeIdx].scrollIntoView({block:'nearest'});
+}
+
+function hideSug() {
+  const box=document.getElementById('suggestions');
+  box.classList.remove('open');
+  box.innerHTML='';
+  activeIdx=-1;
+}
+
+document.addEventListener('click',e=>{
+  if (!e.target.closest('.autocomplete-wrap')) hideSug();
+});
+
+async function predict() {
+  const carName   = document.getElementById('carName').value.trim();
+  const company   = document.getElementById('company').value;
+  const fuelType  = document.getElementById('fuelType').value;
+  const year      = document.getElementById('year').value;
+  const kmsDriven = document.getElementById('kmsDriven').value;
+
+  if (!carName||!company||!fuelType||!year||!kmsDriven) return showErr('All fields required.');
+  const yearNum=parseInt(year);
+  if (yearNum<1995||yearNum>2024) return showErr('Year must be 1995-2024.');
+
+  const btn=document.getElementById('btn');
+  btn.disabled=true;
+  btn.innerHTML='<span class="loader"></span>Running model...';
+  hideRes();
+
+  try {
+    const res=await fetch(API_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:carName,company,year:yearNum,kms_driven:parseInt(kmsDriven),fuel_type:fuelType})
+    });
+    const data=await res.json();
+    if (data.error) return showErr('Model error: '+data.error);
+    showResult(data.price);
+  } catch(e) {
+    showErr('Could not reach server. Is it deployed?');
+    console.error(e);
+  } finally {
+    btn.disabled=false;
+    btn.textContent='Predict Price';
+  }
+}
+
+function fmt(n) {
+  if (n>=10000000) return 'Rs '+(n/10000000).toFixed(2)+' Cr';
+  if (n>=100000)   return 'Rs '+(n/100000).toFixed(2)+' L';
+  return 'Rs '+n.toLocaleString('en-IN');
+}
+
+function showResult(price) {
+  const box=document.getElementById('result');
+  box.className='result show';
+  document.getElementById('rPrice').textContent=fmt(price);
+  document.getElementById('rRange').textContent='Predicted by Linear Regression (R\u00B2 = 0.899)';
+  document.getElementById('rNote').textContent='';
+}
+
+function showErr(msg) {
+  const box=document.getElementById('result');
+  box.className='result err show';
+  document.getElementById('rPrice').textContent='';
+  document.getElementById('rRange').textContent='';
+  document.getElementById('rNote').innerHTML='<span class="err-msg">'+msg+'</span>';
+}
+
+function hideRes() { document.getElementById('result').className='result'; }
+</script>
+</body>
+</html>
